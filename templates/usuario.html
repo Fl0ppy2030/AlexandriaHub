@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<title>Biblioteca</title>
+
+<style>
+body {
+    background: #f5f7fb;
+}
+
+.navbar {
+    backdrop-filter: blur(10px);
+}
+
+.livro-item {
+    transition: 0.25s;
+    cursor: pointer;
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.livro-item:hover {
+    transform: scale(1.05);
+    background: rgba(0,0,0,0.05);
+}
+
+img {
+    height: 250px;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+.modal-content {
+    border-radius: 20px;
+}
+
+#cinemaOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    backdrop-filter: blur(0px);
+    transition: all 0.4s ease;
+    z-index: 1050;
+    pointer-events: none;
+}
+
+#cinemaOverlay.ativo {
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+}
+
+.modal.fade .modal-dialog {
+    transform: scale(0.7) translateY(40px);
+    opacity: 0;
+    transition: all 0.35s ease;
+}
+
+.modal.show .modal-dialog {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+}
+
+.livro-item.animando {
+    transform: scale(1.2);
+    z-index: 1060;
+    position: relative;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="cinemaOverlay"></div>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark bg-dark shadow mb-4">
+    <div class="container d-flex justify-content-between">
+
+        <span class="navbar-brand fw-bold">Alexandria Hub - Acervo</span>
+
+        <div class="d-flex align-items-center gap-3">
+            <span class="text-white small">
+                👤 {{ aluno.nome if aluno else current_user.username }}
+            </span>
+
+            <a href="/logout" class="btn btn-danger btn-sm">
+                Sair
+            </a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+
+<input type="text" id="buscaInput" class="form-control mb-4" placeholder="🔎 Buscar livro ou autor...">
+
+<h4 class="mb-4">Explore os livros</h4>
+
+<div id="listaLivros" class="row">
+
+{% for livro in livros %}
+<div class="col-md-3 livro-card">
+
+    <div class="livro-item"
+         data-titulo="{{ livro.titulo }}"
+         data-autor="{{ livro.autor }}"
+         data-bs-toggle="modal"
+         data-bs-target="#livroModal{{ livro.id }}">
+
+        <img src="{{ livro.capa_url or 'https://picsum.photos/200' }}" class="img-fluid">
+        <p class="mt-2">{{ livro.titulo }}</p>
+
+    </div>
+
+</div>
+{% endfor %}
+
+</div>
+
+</div>
+
+<!-- MODAIS -->
+{% for livro in livros %}
+<div class="modal fade" id="livroModal{{ livro.id }}">
+<div class="modal-dialog modal-lg modal-dialog-centered">
+<div class="modal-content">
+
+<div class="modal-header">
+<h5 class="modal-title">{{ livro.titulo }}</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+
+<div class="modal-body">
+
+<div class="row">
+
+<div class="col-md-4 text-center">
+<img src="{{ livro.capa_url or 'https://picsum.photos/200' }}"
+     class="img-fluid rounded shadow">
+</div>
+
+<div class="col-md-8">
+<p><b>Autor:</b> {{ livro.autor }}</p>
+<p><b>Gênero:</b> {{ livro.genero or 'Não informado' }}</p>
+<p><b>Disponível:</b> {{ livro.quantidade }}</p>
+
+<hr>
+
+<p>{{ livro.descricao }}</p>
+</div>
+
+</div>
+
+</div>
+
+</div>
+</div>
+</div>
+{% endfor %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+const input = document.getElementById("buscaInput");
+const cards = document.querySelectorAll(".livro-card");
+
+input.addEventListener("input", () => {
+    const q = input.value.toLowerCase();
+
+    cards.forEach(card => {
+        const item = card.querySelector(".livro-item");
+
+        if (!item) return;
+
+        const titulo = item.dataset.titulo.toLowerCase();
+        const autor = item.dataset.autor.toLowerCase();
+
+        card.style.display =
+            (titulo.includes(q) || autor.includes(q)) ? "block" : "none";
+    });
+});
+</script>
+
+<script>
+const overlay = document.getElementById("cinemaOverlay");
+
+// quando clicar no livro
+document.querySelectorAll('.livro-item').forEach(item => {
+
+    item.addEventListener('click', function () {
+
+        // ativa fundo escuro
+        overlay.classList.add("ativo");
+
+        // anima o livro
+        this.classList.add("animando");
+
+        setTimeout(() => {
+            this.classList.remove("animando");
+        }, 300);
+    });
+
+});
+
+// quando fechar modal
+document.querySelectorAll('.modal').forEach(modal => {
+
+    modal.addEventListener('hidden.bs.modal', () => {
+        overlay.classList.remove("ativo");
+    });
+
+});
+</script>
+
+</body>
+</html>
