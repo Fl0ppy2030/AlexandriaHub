@@ -50,9 +50,9 @@ class Livro(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     titulo = db.Column(db.String(120))
     autor = db.Column(db.String(120))
-    genero = db.Column(db.String(100))  # NOVO
-    editora = db.Column(db.String(100))  # opcional
-    ano = db.Column(db.Integer)  # opcional
+    genero = db.Column(db.String(100))
+    editora = db.Column(db.String(100))
+    ano = db.Column(db.Integer)
     quantidade = db.Column(db.Integer, default=1)
     capa_url = db.Column(db.String(300))
     descricao = db.Column(db.Text)
@@ -69,8 +69,8 @@ class Emprestimo(db.Model):
     livro_id = db.Column(db.Integer, db.ForeignKey('livro.id'))
     aluno_id = db.Column(db.Integer, db.ForeignKey('aluno.id'))
 
-    data_emprestimo = db.Column(db.DateTime, default=datetime.utcnow)  # quando pegou
-    data_devolucao = db.Column(db.DateTime)  # prazo
+    data_emprestimo = db.Column(db.DateTime, default=datetime.utcnow)
+    data_devolucao = db.Column(db.DateTime)
 
     livro = db.relationship('Livro')
     aluno = db.relationship('Aluno')
@@ -301,7 +301,7 @@ def add_livro():
     livro = Livro(
         titulo=titulo,
         autor=request.form.get('autor'),
-        genero=request.form.get('genero'),  # NOVO
+        genero=request.form.get('genero'),
         editora=request.form.get('editora'),
         ano=ano,
         quantidade=int(request.form.get('quantidade') or 1),
@@ -352,7 +352,7 @@ def delete_livro(id):
 def add_aluno():
     nome = request.form.get('nome')
     matricula = request.form.get('matricula')
-    senha = request.form.get('senha')  # NOVO
+    senha = request.form.get('senha')
 
     if not nome or not matricula or not senha:
         flash("Preencha tudo")
@@ -369,7 +369,7 @@ def add_aluno():
     aluno = Aluno(nome=nome, matricula=matricula)
 
     user = Usuario(
-        username=matricula,  # login = matrícula
+        username=matricula,
         password=generate_password_hash(senha),
         is_admin=False
     )
@@ -455,7 +455,7 @@ def alugar():
     db.session.add(emp)
     db.session.commit()
 
-    # 🔥 LOG DO EMPRÉSTIMO
+    # LOG DO EMPRÉSTIMO
     registrar_log("EMPRÉSTIMO", livro, aluno)
 
     return redirect('/admin')
@@ -471,7 +471,7 @@ def devolver(id):
 
     livro.quantidade += 1
 
-    # 🔥 LOG DA DEVOLUÇÃO
+    # LOG DA DEVOLUÇÃO
     registrar_log("DEVOLUÇÃO", livro, aluno)
 
     db.session.delete(emp)
@@ -506,7 +506,7 @@ def ver_logs():
     except FileNotFoundError:
         linhas = []
 
-    linhas.reverse()  # mais recente primeiro
+    linhas.reverse() 
 
     return render_template("logs.html", logs=linhas)
 
