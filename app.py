@@ -21,7 +21,7 @@ app.config['SECRET_KEY'] = os.environ.get(
     'SECRET_KEY',
     'sua_chave_super_secreta_gigante'
 )
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.arccbvduftqjwovbmuxd:GaryMagrela280809!26@aws-1-sa-east-1.pooler.supabase.com:6543/postgres'
+
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "connect_args": {
         "sslmode": "require"
