@@ -289,13 +289,21 @@ def add_livro():
     if not titulo:
         flash("Título obrigatório")
         return redirect('/admin')
+    
+    ano = request.form.get('ano')
+
+     # trata ano vazio
+    if ano and ano.strip():
+        ano = int(ano)
+    else:
+        ano = None
 
     livro = Livro(
         titulo=titulo,
         autor=request.form.get('autor'),
         genero=request.form.get('genero'),  # NOVO
         editora=request.form.get('editora'),
-        ano=int(request.form.get('ano')) if request.form.get('ano') else None,
+        ano=ano,
         quantidade=int(request.form.get('quantidade') or 1),
         capa_url=request.form.get('capa_url') or buscar_capa(titulo),
         descricao=request.form.get('descricao') or buscar_descricao(titulo)
