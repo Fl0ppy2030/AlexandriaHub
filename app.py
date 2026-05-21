@@ -17,9 +17,16 @@ def registrar_log(tipo, livro, aluno):
 
         f.write(linha)
 
+load_dotenv()
+
 app = Flask(__name__)
+
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "connect_args": {
         "sslmode": "require"
@@ -288,7 +295,7 @@ def add_livro():
         autor=request.form.get('autor'),
         genero=request.form.get('genero'),  # NOVO
         editora=request.form.get('editora'),
-        ano=request.form.get('ano'),
+        ano=int(request.form.get('ano')) if request.form.get('ano') else None,
         quantidade=int(request.form.get('quantidade') or 1),
         capa_url=request.form.get('capa_url') or buscar_capa(titulo),
         descricao=request.form.get('descricao') or buscar_descricao(titulo)
@@ -312,7 +319,7 @@ def editar_livro(id):
     livro.descricao = request.form.get('descricao')
     livro.genero = request.form.get('genero')
     livro.editora = request.form.get('editora')
-    livro.ano = request.form.get('ano')
+    livro.ano = int(request.form.get('ano')) if request.form.get('ano') else None
 
     db.session.commit()
 
