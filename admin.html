@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<title>Painel da Biblioteca</title>
+
+<style>
+body {
+    background: linear-gradient(135deg, #eef2f7, #d9e2ec);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* NAVBAR */
+.navbar {
+    background: rgba(20, 20, 30, 0.9);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+/* CARDS */
+.card-box {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(12px);
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    transition: 0.3s;
+}
+
+.card-box:hover {
+    transform: translateY(-3px);
+}
+
+/* TABELA */
+.table {
+    border-collapse: separate;
+    border-spacing: 0 10px;
+}
+
+.table tr {
+    background: white;
+    border-radius: 10px;
+    transition: 0.2s;
+}
+
+.table tr:hover {
+    transform: scale(1.01);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+.table td, .table th {
+    border: none !important;
+    padding: 12px;
+}
+
+/* IMAGEM */
+.livro-mini {
+    width: 45px;
+    height: 65px;
+    border-radius: 6px;
+    object-fit: cover;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+}
+
+/* BOTÕES */
+.btn {
+    border-radius: 12px;
+    transition: 0.2s;
+}
+
+.btn:hover {
+    transform: scale(1.05);
+}
+
+/* INPUTS */
+.form-control, .form-select {
+    border-radius: 12px;
+    border: 1px solid #dce3ea;
+    padding: 10px;
+}
+
+.form-control:focus {
+    box-shadow: 0 0 0 2px rgba(13,110,253,0.2);
+}
+
+/* TABS */
+.nav-tabs .nav-link {
+    border-radius: 12px;
+    margin-right: 5px;
+    color: #555;
+}
+
+.nav-tabs .nav-link.active {
+    background: #0d6efd;
+    color: white;
+}
+
+/* AUTOCOMPLETE */
+#autocompleteList {
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 999;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+</style>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark bg-dark mb-4">
+<div class="container d-flex justify-content-between">
+<span class="navbar-brand fw-bold">Alexandria Hub</span>
+<a href="/logs" class="btn btn-light btn-sm">Ver Logs</a>
+<a href="/logout" class="btn btn-danger btn-sm">Sair</a>
+</div>
+</nav>
+
+<div class="container">
+
+<ul class="nav nav-tabs mb-3">
+<li class="nav-item">
+<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#livros">Livros</button>
+</li>
+
+<li class="nav-item">
+<button class="nav-link" data-bs-toggle="tab" data-bs-target="#emprestimos">Empréstimos</button>
+</li>
+
+<li class="nav-item">
+<button class="nav-link" data-bs-toggle="tab" data-bs-target="#alunos">Alunos</button>
+</li>
+
+
+
+</ul>
+
+<div class="tab-content">
+
+
+
+<!-- ================= LIVROS ================= -->
+<div class="tab-pane fade show active" id="livros">
+<div class="card-box">
+<input type="text" id="buscaLivros" class="form-control mb-3" placeholder="🔎 Buscar livro...">
+
+<div class="d-flex justify-content-between mb-3">
+<h5>Livros</h5>
+<button class="btn btn-primary px-4" data-bs-toggle="modal" data-bs-target="#modalLivro">
++ Novo Livro
+</button>
+</div>
+
+<table class="table">
+<tr>
+<th>Livro</th>
+<th>Qtd</th>
+<th></th>
+</tr>
+
+{% for livro in livros %}
+<tr class="livro-row" 
+    data-titulo="{{ livro.titulo }}" 
+    data-autor="{{ livro.autor }}">
+<td>
+<img src="{{ livro.capa_url or 'https://picsum.photos/50' }}" class="livro-mini">
+{{ livro.titulo }}
+</td>
+
+<td>{{ livro.quantidade }}</td>
+
+<td>
+<button class="btn btn-warning btn-sm"
+data-bs-toggle="modal"
+data-bs-target="#editar{{ livro.id }}">
+Editar
+</button>
+
+<a href="/delete_livro/{{ livro.id }}" class="btn btn-danger btn-sm">
+Excluir
+</a>
+</td>
+</tr>
+{% endfor %}
+</table>
+
+</div>
+</div>
+
+<!-- ================= EMPRESTIMOS ================= -->
+<div class="tab-pane fade" id="emprestimos">
+<div class="card-box">
+
+<button class="btn btn-warning mb-3" data-bs-toggle="modal" data-bs-target="#modalAluguel">
+Novo Empréstimo
+</button>
+
+<input type="text" id="buscaEmprestimos" 
+class="form-control mb-3" placeholder="🔎 Buscar aluno ou livro...">
+
+<table class="table">
+<tr>
+<th>Livro</th>
+<th>Aluno</th>
+<th>Prazo</th>
+<th></th>
+</tr>
+
+{% for emp in alugados %}
+<tr {% if emp.data_devolucao and emp.data_devolucao < now %}class="table-danger"{% endif %}>
+<td>{{ emp.livro.titulo }}</td>
+
+<td>
+<a href="/aluno/{{ emp.aluno.id }}">
+{{ emp.aluno.nome }}
+</a>
+</td>
+
+<td>
+{% set dias = (emp.data_devolucao - now).days %}
+{% if dias >= 0 %}
+    {{ dias }} dias restantes
+{% else %}
+    <span class="text-danger">Atrasado {{ dias|abs }} dias</span>
+{% endif %}
+</td>
+
+<td>
+<a href="/devolver/{{ emp.id }}" class="btn btn-success btn-sm">
+Devolver
+</a>
+</td>
+</tr>
+{% endfor %}
+</table>
+
+</div>
+</div>
+
+<!-- ================= ALUNOS ================= -->
+<div class="tab-pane fade" id="alunos">
+<div class="card-box">
+<input type="text" id="buscaAlunos" class="form-control mb-3" placeholder="🔎 Buscar aluno...">
+
+
+<button class="btn btn-info mb-3" data-bs-toggle="modal" data-bs-target="#modalAluno">
++ Novo Aluno
+</button>
+
+<table class="table">
+<tr>
+<th>Nome</th>
+<th>Ações</th>
+</tr>
+
+{% for aluno in alunos %}
+<tr class="aluno-row" data-nome="{{ aluno.nome }}">
+<td>{{ aluno.nome }}</td>
+
+<td>
+    <button class="btn btn-warning btn-sm"
+    data-bs-toggle="modal"
+    data-bs-target="#editarAluno{{ aluno.id }}">
+    Editar
+    </button>
+
+    <a href="/delete_aluno/{{ aluno.id }}" class="btn btn-danger btn-sm">
+    Excluir
+    </a>
+</td>
+
+</tr>
+{% endfor %}
+</table>
+
+</div>
+</div>
+
+</div>
+</div>
+
+<!-- ================= MODAL LIVRO ================= -->
+<div class="modal fade" id="modalLivro">
+<div class="modal-dialog">
+<form action="/add_livro" method="POST" class="modal-content">
+
+<div class="modal-header">
+<h5>Novo Livro</h5>
+</div>
+
+<div class="modal-body">
+
+<div class="position-relative">
+<input id="tituloInput" name="titulo" class="form-control mb-2" placeholder="Título" autocomplete="off">
+<div id="autocompleteList" class="list-group position-absolute w-100"></div>
+</div>
+
+<input id="autorInput" name="autor" class="form-control mb-2" placeholder="Autor">
+<input name="quantidade" type="number" value="1" class="form-control mb-2">
+<input id="capaInput" name="capa_url" class="form-control mb-2" placeholder="Capa URL">
+<input name="genero" class="form-control mb-2" placeholder="Gênero">
+<input name="editora" class="form-control mb-2" placeholder="Editora">
+<input name="ano" type="number" class="form-control mb-2" placeholder="Ano">
+<textarea id="descricaoInput" name="descricao" class="form-control" placeholder="Sinopse"></textarea>
+
+</div>
+
+<div class="modal-footer">
+<button class="btn btn-primary px-4 w-100">Salvar</button>
+</div>
+
+</form>
+</div>
+</div>
+
+<!-- ================= MODAIS EDITAR ================= -->
+{% for livro in livros %}
+<div class="modal fade" id="editar{{ livro.id }}">
+<div class="modal-dialog">
+<form action="/editar_livro/{{ livro.id }}" method="POST" class="modal-content">
+
+<div class="modal-header">
+<h5>Editar Livro</h5>
+</div>
+
+<div class="modal-body">
+<input name="titulo" placeholder="Título" class="form-control mb-2" value="{{ livro.titulo }}">
+<input name="autor" placeholder="Autor" class="form-control mb-2" value="{{ livro.autor }}">
+<input name="quantidade" type="number" placeholder="Quantidade" class="form-control mb-2" value="{{ livro.quantidade }}">
+<input name="capa_url" placeholder="Capa URL" class="form-control mb-2" value="{{ livro.capa_url }}">
+<input name="genero" class="form-control mb-2" value="{{ livro.genero }}">
+<input name="editora" class="form-control mb-2" value="{{ livro.editora }}">
+<input name="ano" type="number" class="form-control mb-2" value="{{ livro.ano }}">
+<textarea name="descricao" placeholder="Sinopse" class="form-control">{{ livro.descricao }}</textarea>
+</div>
+
+<div class="modal-footer">
+<button class="btn btn-success">Salvar</button>
+</div>
+
+</form>
+</div>
+</div>
+{% endfor %}
+
+<!-- ================= MODAL NOVO ALUNO ================= -->
+<div class="modal fade" id="modalAluno">
+<div class="modal-dialog">
+<form action="/add_aluno" method="POST" class="modal-content">
+
+<div class="modal-header">
+<h5>Novo Aluno</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+
+<div class="modal-body">
+
+<label class="form-label">Nome</label>
+<input name="nome" class="form-control mb-3" placeholder="Ex: João Silva" required>
+
+<label class="form-label">RA (Matrícula)</label>
+<input name="matricula" class="form-control mb-3" placeholder="Ex: 123456" required>
+
+<label class="form-label">Senha</label>
+<input name="senha" type="password" class="form-control mb-2" placeholder="Defina uma senha (obrigatório)" required>
+
+</div>
+
+<div class="modal-footer">
+<button type="submit" class="btn btn-primary w-100">Cadastrar</button>
+</div>
+
+</form>
+</div>
+</div>
+
+<!-- ================= MODAIS EDITAR ALUNO ================= -->
+{% for aluno in alunos %}
+<div class="modal fade" id="editarAluno{{ aluno.id }}">
+<div class="modal-dialog">
+<form action="/editar_aluno/{{ aluno.id }}" method="POST" class="modal-content">
+
+<div class="modal-header">
+<h5>Editar Aluno</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+
+<div class="modal-body">
+
+<label class="form-label">Nome</label>
+<input name="nome" class="form-control mb-3" value="{{ aluno.nome }}" required>
+
+<label class="form-label">RA (Matrícula)</label>
+<input name="matricula" class="form-control mb-3" value="{{ aluno.matricula }}" required>
+
+<label class="form-label">Nova Senha</label>
+<input name="senha" type="password" class="form-control mb-2" placeholder="Deixe vazio para não alterar">
+
+<small class="text-muted">Se preencher a senha, ela será atualizada.</small>
+
+</div>
+
+<div class="modal-footer">
+<button type="submit" class="btn btn-success w-100">Salvar Alterações</button>
+</div>
+</form>
+</div>
+</div>
+{% endfor %}
+
+
+
+<!-- ================= MODAL EMPRESTIMO ================= -->
+<div class="modal fade" id="modalAluguel">
+<div class="modal-dialog">
+<form action="/alugar" method="POST" class="modal-content">
+<input type="text" id="buscarLivroEmprestimo" 
+class="form-control mb-2" placeholder="🔎 Buscar livro...">
+
+<div class="modal-header">
+<h5>Empréstimo</h5>
+</div>
+
+<div class="modal-body">
+
+<select name="livro_id" class="form-select mb-2">
+{% for livro in livros %}
+<option value="{{ livro.id }}">{{ livro.titulo }}</option>
+{% endfor %}
+</select>
+
+<select name="aluno_id" class="form-select">
+{% for aluno in alunos %}
+<option value="{{ aluno.id }}">{{ aluno.nome }}</option>
+{% endfor %}
+</select>
+
+<input name="dias" type="number" class="form-control mt-2" placeholder="Dias de empréstimo (ex: 7)" value="7">
+
+</div>
+
+<div class="modal-footer">
+<button class="btn btn-warning w-100">Confirmar</button>
+</div>
+
+</form>
+</div>
+</div>
+
+<!-- (SEU HTML INTEIRO IGUAL ATÉ O FINAL DOS MODAIS — NÃO ALTEREI NADA ACIMA DISSO) -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    // =========================
+    // 🔎 BUSCA LIVROS
+    // =========================
+    const buscaLivros = document.getElementById("buscaLivros");
+    const livroRows = document.querySelectorAll(".livro-row");
+
+    if (buscaLivros) {
+        buscaLivros.addEventListener("input", () => {
+            const q = buscaLivros.value.toLowerCase();
+
+            livroRows.forEach(row => {
+                const titulo = row.dataset.titulo.toLowerCase();
+                const autor = row.dataset.autor.toLowerCase();
+
+                row.style.display =
+                    (titulo.includes(q) || autor.includes(q)) ? "" : "none";
+            });
+        });
+    }
+
+    // =========================
+    // 🔎 BUSCA ALUNOS
+    // =========================
+    const buscaAlunos = document.getElementById("buscaAlunos");
+    const alunoRows = document.querySelectorAll(".aluno-row");
+
+    if (buscaAlunos) {
+        buscaAlunos.addEventListener("input", () => {
+            const q = buscaAlunos.value.toLowerCase();
+
+            alunoRows.forEach(row => {
+                const nome = row.dataset.nome.toLowerCase();
+                row.style.display = nome.includes(q) ? "" : "none";
+            });
+        });
+    }
+
+// =========================
+// 🔎 BUSCA EMPRESTIMOS
+// =========================
+const buscaEmp = document.getElementById("buscaEmprestimos");
+const linhasEmp = document.querySelectorAll("#emprestimos table tr");
+
+if (buscaEmp) {
+    buscaEmp.addEventListener("input", () => {
+        const q = buscaEmp.value.toLowerCase();
+
+        linhasEmp.forEach((row, index) => {
+            if (index === 0) return; // ignora header
+
+            const texto = row.textContent.toLowerCase();
+
+            row.style.display = texto.includes(q) ? "" : "none";
+        });
+    });
+}
+
+    // =========================
+    // 📚 AUTOCOMPLETE LIVROS
+    // =========================
+    const input = document.getElementById("tituloInput");
+    const list = document.getElementById("autocompleteList");
+
+    const autorInput = document.getElementById("autorInput");
+    const capaInput = document.getElementById("capaInput");
+    const descricaoInput = document.getElementById("descricaoInput");
+
+    let timeout = null;
+    let lastQuery = "";
+
+    if (input) {
+        input.addEventListener("input", () => {
+
+            clearTimeout(timeout);
+
+            timeout = setTimeout(async () => {
+
+                let query = input.value.trim();
+
+                if(query.length < 3){
+                    list.innerHTML = "";
+                    return;
+                }
+
+                if(query === lastQuery) return;
+                lastQuery = query;
+
+                list.innerHTML = "<div class='list-group-item'>Buscando...</div>";
+
+                try {
+                    let res = await fetch(`/buscar_livros?q=${encodeURIComponent(query)}`);
+                    let data = await res.json();
+
+                    list.innerHTML = "";
+
+                    if(data.livros.length === 0){
+                        list.innerHTML = "<div class='list-group-item'>Nenhum livro encontrado</div>";
+                        return;
+                    }
+
+                    data.livros.forEach(livro => {
+                        let item = document.createElement("a");
+                        item.classList.add("list-group-item", "list-group-item-action");
+
+                        item.innerHTML = `
+                            <div class="d-flex">
+                                <img src="${livro.capa || 'https://picsum.photos/50'}" width="40" class="me-2">
+                                <div>
+                                    <b>${livro.titulo}</b><br>
+                                    <small>${livro.autor}</small>
+                                </div>
+                            </div>
+                        `;
+
+                        item.onclick = () => {
+                            input.value = livro.titulo;
+                            autorInput.value = livro.autor;
+                            capaInput.value = livro.capa;
+                            descricaoInput.value = livro.descricao;
+                            list.innerHTML = "";
+                        };
+
+                        list.appendChild(item);
+                    });
+
+                } catch (err) {
+                    console.error(err);
+                    list.innerHTML = "<div class='list-group-item text-danger'>Erro ao buscar</div>";
+                }
+
+            }, 500);
+
+        });
+
+        document.addEventListener("click", (e) => {
+            if(!input.contains(e.target) && !list.contains(e.target)){
+                list.innerHTML = "";
+            }
+        });
+    }
+
+    // =========================
+    // 📦 BUSCA NO MODAL EMPRÉSTIMO
+    // =========================
+    const modal = document.getElementById("modalAluguel");
+
+    if (modal) {
+        modal.addEventListener("shown.bs.modal", () => {
+
+            const inputEmp = document.getElementById("buscarLivroEmprestimo");
+            const selectLivro = modal.querySelector("select[name='livro_id']");
+
+            if (!inputEmp || !selectLivro) return;
+
+            inputEmp.value = ""; // limpa ao abrir
+
+            inputEmp.addEventListener("input", () => {
+                const q = inputEmp.value.toLowerCase();
+
+                Array.from(selectLivro.options).forEach(opt => {
+                    const texto = opt.textContent.toLowerCase();
+                    opt.style.display = texto.includes(q) ? "" : "none";
+                });
+            });
+
+        });
+    }
+
+});
+</script>
+
+</body>
+</html>
