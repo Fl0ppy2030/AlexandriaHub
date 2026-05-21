@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 import webbrowser
 
 from flask import Flask, render_template, request, redirect, flash, abort, jsonify
@@ -17,11 +18,8 @@ def registrar_log(tipo, livro, aluno):
         f.write(linha)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get(
-    'SECRET_KEY',
-    'sua_chave_super_secreta_gigante'
-)
-
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "connect_args": {
         "sslmode": "require"
