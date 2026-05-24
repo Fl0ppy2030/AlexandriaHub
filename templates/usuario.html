@@ -71,6 +71,42 @@ img {
     position: relative;
 }
 
+.capa-livro {
+
+    width: 100%;
+
+    height: 320px;
+
+    object-fit: cover;
+
+    border-radius: 10px;
+
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+
+    transition: 0.3s;
+
+}
+
+.capa-livro:hover {
+
+    transform: scale(1.02);
+
+}
+
+.capa-modal {
+
+    width: 100%;
+
+    max-height: 500px;
+
+    object-fit: cover;
+
+    border-radius: 10px;
+
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+
+}
+    
 </style>
 </head>
 
@@ -113,7 +149,8 @@ img {
          data-bs-toggle="modal"
          data-bs-target="#livroModal{{ livro.id }}">
 
-        <img src="{{ livro.capa_url or 'https://picsum.photos/200' }}" class="img-fluid">
+        <img src="{{ livro.capa_url or 'https://picsum.photos/200' }}"
+     class="capa-livro">
         <p class="mt-2">{{ livro.titulo }}</p>
 
     </div>
@@ -142,7 +179,7 @@ img {
 
 <div class="col-md-4 text-center">
 <img src="{{ livro.capa_url or 'https://picsum.photos/200' }}"
-     class="img-fluid rounded shadow">
+     class="capa-modal">
 </div>
 
 <div class="col-md-8">
