@@ -479,6 +479,51 @@ def devolver(id):
 
     return redirect('/admin')
 
+# RELATÓRIOS
+@app.route('/relatorios')
+@login_required
+def relatorios():
+
+    if not current_user.is_admin:
+        abort(403)
+
+    return render_template("relatorios.html")
+
+# RELATÓRIO
+@app.route('/gerar_relatorio')
+@login_required
+def gerar_relatorio():
+
+    if not current_user.is_admin:
+        abort(403)
+
+    ano = int(request.args.get("ano"))
+    mes = int(request.args.get("mes"))
+
+    emprestimos = Emprestimo.query.all()
+
+    if mes == 0:
+
+        emprestimos = [
+            e for e in emprestimos
+            if e.data_emprestimo.year == ano
+        ]
+
+    else:
+
+        emprestimos = [
+            e for e in emprestimos
+            if e.data_emprestimo.year == ano
+            and e.data_emprestimo.month == mes
+        ]
+
+    return render_template(
+        "relatorio_resultado.html",
+        emprestimos=emprestimos,
+        ano=ano,
+        mes=mes
+    )
+
 # ---------------- USUARIO ----------------
 
 @app.route('/meu_acervo')
