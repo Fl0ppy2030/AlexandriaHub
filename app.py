@@ -1,37 +1,15 @@
 import os
-from dotenv import load_dotenv
-import webbrowser
 
-from flask import Flask, render_template, request, redirect, flash, abort, jsonify
+from flask import Config, Flask, render_template, request, redirect, flash, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import requests
 from datetime import datetime, timedelta
 
-def registrar_log(tipo, livro, aluno):
-    with open("logs.txt", "a", encoding="utf-8") as f:
-        agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-
-        linha = f"[{agora}] {tipo} | Livro: {livro.titulo} | Aluno: {aluno.nome}\n"
-
-        f.write(linha)
-
-load_dotenv()
-
 app = Flask(__name__)
-
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "connect_args": {
-        "sslmode": "require"
-    }
-}
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_fallback')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///biblioteca.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -40,28 +18,53 @@ login_manager.login_view = 'login'
 
 # ---------------- MODELOS ----------------
 
+class Escola(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(150), nullable=False)
+
+    livros = db.relationship('Livro')
+    alunos = db.relationship('Aluno')
+    usuarios = db.relationship('Usuario')
+
 class Usuario(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True)
+
+    username = db.Column(db.String(50))
     password = db.Column(db.String(200))
+
     is_admin = db.Column(db.Boolean, default=False)
+    is_superadmin = db.Column(db.Boolean, default=False)
+
+    escola_id = db.Column(
+        db.Integer,
+        db.ForeignKey('escola.id'),
+        nullable=True
+    )
 
 class Livro(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     titulo = db.Column(db.String(120))
     autor = db.Column(db.String(120))
-    genero = db.Column(db.String(100))
-    editora = db.Column(db.String(100))
-    ano = db.Column(db.Integer)
+    genero = db.Column(db.String(100))  # NOVO
+    editora = db.Column(db.String(100))  # opcional
+    ano = db.Column(db.Integer)  # opcional
     quantidade = db.Column(db.Integer, default=1)
     capa_url = db.Column(db.String(300))
     descricao = db.Column(db.Text)
+    escola_id = db.Column(
+        db.Integer,
+        db.ForeignKey('escola.id')
+    )
 
 class Aluno(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100))
     matricula = db.Column(db.String(20), unique=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    escola_id = db.Column(
+        db.Integer,
+        db.ForeignKey('escola.id')
+    )
     
 
 class Emprestimo(db.Model):
@@ -69,8 +72,8 @@ class Emprestimo(db.Model):
     livro_id = db.Column(db.Integer, db.ForeignKey('livro.id'))
     aluno_id = db.Column(db.Integer, db.ForeignKey('aluno.id'))
 
-    data_emprestimo = db.Column(db.DateTime, default=datetime.utcnow)
-    data_devolucao = db.Column(db.DateTime)
+    data_emprestimo = db.Column(db.DateTime, default=datetime.utcnow)  # quando pegou
+    data_devolucao = db.Column(db.DateTime)  # prazo
 
     livro = db.relationship('Livro')
     aluno = db.relationship('Aluno')
@@ -173,7 +176,14 @@ def login():
 
         if user and check_password_hash(user.password, request.form['password']):
             login_user(user)
-            return redirect('/admin' if user.is_admin else '/meu_acervo')
+            if user.is_superadmin:
+                return redirect('/superadmin')
+
+            elif user.is_admin:
+                return redirect('/admin')
+
+            else:
+                return redirect('/meu_acervo')
 
         flash("Login inválido")
 
@@ -207,7 +217,8 @@ def cadastro():
 
         aluno = Aluno(
             nome=nome,
-            matricula=ra
+            matricula=ra,
+            escola_id=current_user.escola_id
         )
 
         db.session.add(user)
@@ -217,7 +228,7 @@ def cadastro():
         login_user(user)
         return redirect('/meu_acervo')
 
-    return render_template('cadastro.html')
+    abort(404)
 
 # LOGOUT
 @app.route('/logout')
@@ -230,10 +241,14 @@ def logout():
 @app.route('/aluno/<int:id>')
 @login_required
 def ver_aluno(id):
-    aluno = Aluno.query.get_or_404(id)
+    aluno = Aluno.query.filter_by(
+         id=request.form['aluno_id'],
+        escola_id=current_user.escola_id
+    ).first_or_404()
+
     emprestimos = Emprestimo.query.filter_by(aluno_id=id).all()
 
-    return render_template('aluno_detalhe.html', aluno=aluno, emprestimos=emprestimos, now=datetime.now())
+    return render_template('aluno_detalhe.html', aluno=aluno, emprestimos=emprestimos, now=datetime.utcnow())
 
 @app.route('/buscar', methods=['GET'])
 def buscar():
@@ -243,9 +258,12 @@ def buscar():
         return jsonify([])
 
     livros = Livro.query.filter(
+    Livro.escola_id == current_user.escola_id,
+    (
         (Livro.titulo.ilike(f"%{q}%")) |
         (Livro.autor.ilike(f"%{q}%"))
-    ).all()
+    )
+).all()
 
     resultado = []
 
@@ -259,6 +277,42 @@ def buscar():
 
     return jsonify(resultado)
 
+@app.route('/registrar_escola', methods=['GET', 'POST'])
+def registrar_escola():
+
+    if request.method == 'POST':
+
+        nome_escola = request.form.get('nome_escola')
+        admin_user = request.form.get('usuario')
+        admin_pass = request.form.get('senha')
+
+        if Escola.query.filter_by(nome=nome_escola).first():
+            flash("Escola já cadastrada")
+            return redirect('/registrar_escola')
+
+        escola = Escola(
+            nome=nome_escola
+        )
+
+        db.session.add(escola)
+        db.session.commit()
+
+        admin = Usuario(
+            username=admin_user,
+            password=generate_password_hash(admin_pass),
+            is_admin=True,
+            escola_id=escola.id
+        )
+
+        db.session.add(admin)
+        db.session.commit()
+
+        flash("Escola criada com sucesso")
+
+        return redirect('/login')
+
+    return render_template('registrar_escola.html')
+
 # ---------------- ADMIN ----------------
 
 @app.route('/admin')
@@ -271,10 +325,18 @@ def admin():
 
     return render_template(
         'admin.html',
-        livros=Livro.query.all(),
-        alunos=Aluno.query.all(),
-        alugados=Emprestimo.query.all(),
-        now=datetime.now()
+        livros=Livro.query.filter_by(
+            escola_id=current_user.escola_id
+        ).all(),
+        alunos=Aluno.query.filter_by(
+            escola_id=current_user.escola_id
+        ).all(),
+        alugados = Emprestimo.query.join(
+            Aluno
+        ).filter(
+            Aluno.escola_id == current_user.escola_id
+        ).all(),
+        now=datetime.utcnow()
 )
 
 # ADD LIVRO
@@ -289,24 +351,17 @@ def add_livro():
     if not titulo:
         flash("Título obrigatório")
         return redirect('/admin')
-    
-    ano = request.form.get('ano')
-
-     # trata ano vazio
-    if ano and ano.strip():
-        ano = int(ano)
-    else:
-        ano = None
 
     livro = Livro(
         titulo=titulo,
         autor=request.form.get('autor'),
-        genero=request.form.get('genero'),
+        genero=request.form.get('genero'),  # NOVO
         editora=request.form.get('editora'),
-        ano=ano,
+        ano=request.form.get('ano'),
         quantidade=int(request.form.get('quantidade') or 1),
         capa_url=request.form.get('capa_url') or buscar_capa(titulo),
-        descricao=request.form.get('descricao') or buscar_descricao(titulo)
+        descricao=request.form.get('descricao') or buscar_descricao(titulo),
+        escola_id=current_user.escola_id
     )
 
     db.session.add(livro)
@@ -318,7 +373,10 @@ def add_livro():
 @app.route('/editar_livro/<int:id>', methods=['POST'])
 @login_required
 def editar_livro(id):
-    livro = Livro.query.get_or_404(id)
+    livro = Livro.query.filter_by(
+        id=id,
+        escola_id=current_user.escola_id
+).first_or_404()
 
     livro.titulo = request.form.get('titulo')
     livro.autor = request.form.get('autor')
@@ -327,7 +385,7 @@ def editar_livro(id):
     livro.descricao = request.form.get('descricao')
     livro.genero = request.form.get('genero')
     livro.editora = request.form.get('editora')
-    livro.ano = int(request.form.get('ano')) if request.form.get('ano') else None
+    livro.ano = request.form.get('ano')
 
     db.session.commit()
 
@@ -337,7 +395,10 @@ def editar_livro(id):
 @app.route('/delete_livro/<int:id>')
 @login_required
 def delete_livro(id):
-    livro = Livro.query.get_or_404(id)
+    livro = Livro.query.filter_by(
+        id=id,
+        escola_id=current_user.escola_id
+).first_or_404()
 
     Emprestimo.query.filter_by(livro_id=id).delete()
 
@@ -350,6 +411,7 @@ def delete_livro(id):
 @app.route('/add_aluno', methods=['POST'])
 @login_required
 def add_aluno():
+
     nome = request.form.get('nome')
     matricula = request.form.get('matricula')
     senha = request.form.get('senha')
@@ -366,12 +428,17 @@ def add_aluno():
         flash("Usuário já existe")
         return redirect('/admin')
 
-    aluno = Aluno(nome=nome, matricula=matricula)
+    aluno = Aluno(
+        nome=nome,
+        matricula=matricula,
+        escola_id=current_user.escola_id
+    )
 
     user = Usuario(
         username=matricula,
         password=generate_password_hash(senha),
-        is_admin=False
+        is_admin=False,
+        escola_id=current_user.escola_id
     )
 
     db.session.add(aluno)
@@ -387,7 +454,10 @@ def editar_aluno(id):
     if not current_user.is_admin:
         abort(403)
 
-    aluno = Aluno.query.get_or_404(id)
+    aluno = Aluno.query.filter_by(
+        id=request.form['aluno_id'],
+        escola_id=current_user.escola_id
+    ).first_or_404()
     usuario = Usuario.query.filter_by(username=aluno.matricula).first()
 
     nome = request.form.get('nome')
@@ -421,7 +491,10 @@ def editar_aluno(id):
 @app.route('/delete_aluno/<int:id>')
 @login_required
 def delete_aluno(id):
-    aluno = Aluno.query.get_or_404(id)
+    aluno = Aluno.query.filter_by(
+        id=request.form['aluno_id'],
+        escola_id=current_user.escola_id
+    ).first_or_404()
 
     Emprestimo.query.filter_by(aluno_id=id).delete()
 
@@ -434,8 +507,10 @@ def delete_aluno(id):
 @app.route('/alugar', methods=['POST'])
 @login_required
 def alugar():
-    livro = Livro.query.get_or_404(request.form['livro_id'])
-    aluno = Aluno.query.get_or_404(request.form['aluno_id'])
+    livro = Livro.query.filter_by(
+        id=request.form['livro_id'],
+        escola_id=current_user.escola_id
+    ).first_or_404()
 
     if livro.quantidade <= 0:
         flash("Sem estoque")
@@ -444,19 +519,16 @@ def alugar():
     livro.quantidade -= 1
 
     dias = max(1, int(request.form.get('dias') or 7))
-    data_devolucao = datetime.now() + timedelta(days=dias)
 
-    emp = Emprestimo(
-        livro_id=livro.id,
-        aluno_id=aluno.id,
+    data_devolucao = datetime.utcnow() + timedelta(days=dias)
+
+    db.session.add(Emprestimo(
+        livro_id=request.form['livro_id'],
+        aluno_id=request.form['aluno_id'],
         data_devolucao=data_devolucao
-    )
+    ))
 
-    db.session.add(emp)
     db.session.commit()
-
-    # LOG DO EMPRÉSTIMO
-    registrar_log("EMPRÉSTIMO", livro, aluno)
 
     return redirect('/admin')
 
@@ -464,22 +536,20 @@ def alugar():
 @app.route('/devolver/<int:id>')
 @login_required
 def devolver(id):
-    emp = Emprestimo.query.get_or_404(id)
+    emp = Emprestimo.query.join(
+        Aluno
+    ).filter(
+        Emprestimo.id == id,
+        Aluno.escola_id == current_user.escola_id
+    ).first_or_404()
 
-    livro = emp.livro
-    aluno = emp.aluno
-
-    livro.quantidade += 1
-
-    # LOG DA DEVOLUÇÃO
-    registrar_log("DEVOLUÇÃO", livro, aluno)
+    emp.livro.quantidade += 1
 
     db.session.delete(emp)
     db.session.commit()
 
     return redirect('/admin')
 
-# RELATÓRIOS
 @app.route('/relatorios')
 @login_required
 def relatorios():
@@ -489,7 +559,6 @@ def relatorios():
 
     return render_template("relatorios.html")
 
-# RELATÓRIO
 @app.route('/gerar_relatorio')
 @login_required
 def gerar_relatorio():
@@ -524,6 +593,88 @@ def gerar_relatorio():
         mes=mes
     )
 
+# ---------------- SUPERADMIN ----------------
+
+@app.route('/superadmin')
+@login_required
+def superadmin():
+
+    if not current_user.is_superadmin:
+        abort(403)
+
+    escolas = Escola.query.all()
+
+    dados_escolas = []
+
+    for escola in escolas:
+
+        dados_escolas.append({
+            "id": escola.id,
+            "nome": escola.nome,
+            "livros": Livro.query.filter_by(
+                escola_id=escola.id
+            ).count(),
+
+            "alunos": Aluno.query.filter_by(
+                escola_id=escola.id
+            ).count(),
+
+            "emprestimos": Emprestimo.query.join(
+                Aluno
+            ).filter(
+                Aluno.escola_id == escola.id
+            ).count()
+        })
+
+    return render_template(
+        "superadmin.html",
+        escolas=dados_escolas,
+        total_escolas=Escola.query.count(),
+        total_livros=Livro.query.count(),
+        total_alunos=Aluno.query.count(),
+        total_emprestimos=Emprestimo.query.count()
+    )
+
+# DETALHES ESCOLA
+
+@app.route('/escola/<int:id>')
+@login_required
+def detalhes_escola(id):
+
+    if not current_user.is_superadmin:
+        abort(403)
+
+    escola = Escola.query.get_or_404(id)
+
+    livros = Livro.query.filter_by(
+        escola_id=escola.id
+    ).all()
+
+    alunos = Aluno.query.filter_by(
+        escola_id=escola.id
+    ).all()
+
+    admins = Usuario.query.filter_by(
+        escola_id=escola.id,
+        is_admin=True
+    ).all()
+
+    emprestimos = Emprestimo.query.join(
+        Aluno
+    ).filter(
+        Aluno.escola_id == escola.id
+    ).all()
+
+    return render_template(
+        "detalhes_escola.html",
+        escola=escola,
+        livros=livros,
+        alunos=alunos,
+        admins=admins,
+        emprestimos=emprestimos
+    )
+
+
 # ---------------- USUARIO ----------------
 
 @app.route('/meu_acervo')
@@ -533,43 +684,32 @@ def usuario():
 
     return render_template(
         'usuario.html',
-        livros=Livro.query.all(),
+        livros=Livro.query.filter_by(
+            escola_id=current_user.escola_id
+        ).all(),
         aluno=aluno
     )
-
-# ----------------- LOGS -----------------
-
-@app.route('/logs')
-@login_required
-def ver_logs():
-    if not current_user.is_admin:
-        abort(403)
-
-    try:
-        with open("logs.txt", "r", encoding="utf-8") as f:
-            linhas = f.readlines()
-    except FileNotFoundError:
-        linhas = []
-
-    linhas.reverse() 
-
-    return render_template("logs.html", logs=linhas)
 
 # ---------------- START ----------------
 
 if __name__ == '__main__':
     with app.app_context():
+
         db.create_all()
 
-        if not Usuario.query.filter_by(username='admin').first():
-            db.session.add(Usuario(
-                username='admin',
-                password=generate_password_hash('admin123'),
-                is_admin=True
-            ))
-            db.session.commit()
+        if not Usuario.query.filter_by(
+            username=Config.SUPERADMIN_USER
+        ).first():
 
+            admin = Usuario(
+                username=Config.SUPERADMIN_USER,
+                password=generate_password_hash(
+                    Config.SUPERADMIN_PASSWORD
+                ),
+                is_superadmin=True
+            )
 
+            db.session.add(admin)
+    db.session.commit()
 
-port = int(os.environ.get("PORT", 5000))
-app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)
