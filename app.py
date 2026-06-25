@@ -318,6 +318,9 @@ def add_livro():
 @app.route('/editar_livro/<int:id>', methods=['POST'])
 @login_required
 def editar_livro(id):
+    if not current_user.is_admin:
+        abort(403)
+
     livro = Livro.query.get_or_404(id)
 
     livro.titulo = request.form.get('titulo')
@@ -337,6 +340,9 @@ def editar_livro(id):
 @app.route('/delete_livro/<int:id>')
 @login_required
 def delete_livro(id):
+    if not current_user.is_admin:
+        abort(403)
+
     livro = Livro.query.get_or_404(id)
 
     Emprestimo.query.filter_by(livro_id=id).delete()
@@ -350,6 +356,9 @@ def delete_livro(id):
 @app.route('/add_aluno', methods=['POST'])
 @login_required
 def add_aluno():
+    if not current_user.is_admin:
+        abort(403)
+
     nome = request.form.get('nome')
     matricula = request.form.get('matricula')
     senha = request.form.get('senha')
@@ -421,6 +430,9 @@ def editar_aluno(id):
 @app.route('/delete_aluno/<int:id>')
 @login_required
 def delete_aluno(id):
+    if not current_user.is_admin:
+        abort(403)
+
     aluno = Aluno.query.get_or_404(id)
 
     Emprestimo.query.filter_by(aluno_id=id).delete()
@@ -434,6 +446,9 @@ def delete_aluno(id):
 @app.route('/alugar', methods=['POST'])
 @login_required
 def alugar():
+    if not current_user.is_admin:
+        abort(403)
+
     livro = Livro.query.get_or_404(request.form['livro_id'])
     aluno = Aluno.query.get_or_404(request.form['aluno_id'])
 
@@ -464,6 +479,9 @@ def alugar():
 @app.route('/devolver/<int:id>')
 @login_required
 def devolver(id):
+    if not current_user.is_admin:
+        abort(403)
+
     emp = Emprestimo.query.get_or_404(id)
 
     livro = emp.livro
