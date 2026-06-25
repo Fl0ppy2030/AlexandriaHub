@@ -557,19 +557,20 @@ def ver_logs():
 
 # ---------------- START ----------------
 
+with app.app_context():
+    db.create_all()
+
+    admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+
+    if not Usuario.query.filter_by(username=admin_username).first():
+        db.session.add(Usuario(
+            username=admin_username,
+            password=generate_password_hash(admin_password),
+            is_admin=True
+        ))
+        db.session.commit()
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-
-        if not Usuario.query.filter_by(username='admin').first():
-            db.session.add(Usuario(
-                username='admin',
-                password=generate_password_hash('admin123'),
-                is_admin=True
-            ))
-            db.session.commit()
-
-
-
-port = int(os.environ.get("PORT", 5000))
-app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
