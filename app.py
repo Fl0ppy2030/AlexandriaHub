@@ -1,6 +1,6 @@
 import os
 
-from flask import Config, Flask, render_template, request, redirect, flash, abort, jsonify
+from flask import Flask, render_template, request, redirect, flash, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -8,6 +8,15 @@ import requests
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
+SUPERADMIN_USER = os.getenv(
+    "SUPERADMIN_USER",
+    "admin"
+)
+
+SUPERADMIN_PASSWORD = os.getenv(
+    "SUPERADMIN_PASSWORD",
+    "admin123"
+)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_fallback')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///biblioteca.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -693,23 +702,24 @@ def usuario():
 # ---------------- START ----------------
 
 if __name__ == '__main__':
+
     with app.app_context():
 
         db.create_all()
 
         if not Usuario.query.filter_by(
-            username=Config.SUPERADMIN_USER
+            username=SUPERADMIN_USER
         ).first():
 
             admin = Usuario(
-                username=Config.SUPERADMIN_USER,
+                username=SUPERADMIN_USER,
                 password=generate_password_hash(
-                    Config.SUPERADMIN_PASSWORD
+                    SUPERADMIN_PASSWORD
                 ),
                 is_superadmin=True
             )
 
             db.session.add(admin)
-    db.session.commit()
+            db.session.commit()
 
     app.run(debug=True)
